@@ -470,11 +470,20 @@ void ShutterPowerOff(uint8_t i) {
   }
 }
 
+void ShutterPublishPosition(uint8_t i)
+{
+    // sending MQTT result to broker
+    char scommand[CMDSZ];
+    char stopic[TOPSZ];
+    snprintf_P(scommand, sizeof(scommand),PSTR(D_SHUTTER "%d"), i+1);
+    GetTopic_P(stopic, STAT, TasmotaGlobal.mqtt_topic, scommand);
+    Response_P("%d", (Settings.shutter_options[i] & 1) ? 100 - Settings.shutter_position[i]: Settings.shutter_position[i]);
+    MqttPublish(stopic, Settings.flag.mqtt_power_retain);  // CMND_POWERRETAIN
+}
+
 void ShutterUpdatePosition(void)
 {
 
-  char scommand[CMDSZ];
-  char stopic[TOPSZ];
   for (uint32_t i = 0; i < TasmotaGlobal.shutters_present; i++) {
     if (Shutter[i].direction != 0) {
       if (!ShutterGlobal.start_reported) {
@@ -497,11 +506,7 @@ void ShutterUpdatePosition(void)
 
         ShutterLogPos(i);
 
-        // sending MQTT result to broker
-        snprintf_P(scommand, sizeof(scommand),PSTR(D_SHUTTER "%d"), i+1);
-        GetTopic_P(stopic, STAT, TasmotaGlobal.mqtt_topic, scommand);
-        Response_P("%d", (Settings.shutter_options[i] & 1) ? 100 - Settings.shutter_position[i]: Settings.shutter_position[i]);
-        MqttPublish(stopic, Settings.flag.mqtt_power_retain);  // CMND_POWERRETAIN
+        ShutterPublishPosition(i);
         ShutterReportPosition(true, i);
         TasmotaGlobal.rules_flag.shutter_moved = 1;
         XdrvRulesProcess();
@@ -1367,6 +1372,7 @@ void CmndShutterSetClose(void)
     ShutterStartInit(XdrvMailbox.index -1, 0, 0);
     Settings.shutter_position[XdrvMailbox.index -1] = 0;
     ResponseCmndIdxChar(D_CONFIGURATION_RESET);
+    ShutterPublishPosition(XdrvMailbox.index -1);
   }
 }
 
@@ -1377,6 +1383,7 @@ void CmndShutterSetOpen(void)
     ShutterStartInit(XdrvMailbox.index -1, 0, Shutter[XdrvMailbox.index -1].open_max);
     Settings.shutter_position[XdrvMailbox.index -1] = 100;
     ResponseCmndIdxChar(D_CONFIGURATION_RESET);
+    ShutterPublishPosition(XdrvMailbox.index -1);
   }
 }
 
